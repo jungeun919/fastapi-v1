@@ -1,15 +1,22 @@
 # 23.03.29 16:00
-from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Response, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 import cv2
 import json
 import base64
 import time
 import uvicorn
-import gzip
+
+from typing import List
+from models import Medicine
+from db import SessionLocal
+from sqlalchemy.orm import Session
+
 
 app = FastAPI()
 
+# 웹캠 처리
 @app.get("/webcam_stream")
 async def webcam_feed():
     cap = cv2.VideoCapture(0)
@@ -36,6 +43,18 @@ async def webcam_feed():
         cap.release()
 
     return StreamingResponse(video_stream(), media_type="application/json")
+
+def get_db():
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
+
+@app.get("/medicine/")
+def read_medicine(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    medicine = db.query(Medicine).offset(skip).limit(limit).all()
+    return medicine
 
 if __name__ == '__main__':
     uvicorn.run("main:app", host="0.0.0.0", port=8000, access_log=False)
